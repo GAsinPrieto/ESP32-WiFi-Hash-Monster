@@ -1,62 +1,67 @@
 #include <M5StickC.h>
 #include <WiFi.h>
-
 #include "time.h"
 
-// Set the name and password of the wifi to be connected.
+struct tm timeInfo;
+
+//WIFI Credentials
 const char* ssid     = "maiher";
 const char* password = "MH-08076298";
 
-const char* ntpServer =
-    "time1.aliyun.com";  // Set the connect NTP server.
-const long gmtOffset_sec     = 3600;
-const int daylightOffset_sec = 3600;
+const char* ntp_server = "ntp.i2t.ehu.es";
+const long gmt_offset     = 3600; //in seconds
+const int daylightsaving = 3600; //offset in seconds
 
-struct tm timeinfo;
-
-void printLocalTime() {  // Output current time.
-    if (!getLocalTime(&timeinfo)) {  // Return 1 when the time is successfully obtained.
-        M5.Lcd.println("Failed to obtain time");
-        return;
-    }
-    M5.Lcd.println(&timeinfo, "%A, %B %d \n%Y %H:%M:%S");  // Screen prints date and time.   
+void checkServer() {
+  if (!getLocalTime(&timeInfo)) {
+    M5.Lcd.println("Server unreachable");
+    while(1);
+  }
 }
 
-void setTime(struct tm timeinfo){
+
+void printTime() {
+  if (!getLocalTime(&timeInfo)) {
+    M5.Lcd.println("Server unreachable");
+    return;
+  }
+  M5.Lcd.println(&timeInfo, "%A, %B %d \n%Y %H:%M:%S");
+}
+
+void setTime(struct tm timeInfo){
   RTC_TimeTypeDef TimeStruct;
-  TimeStruct.Hours   = timeinfo.tm_hour;
-  TimeStruct.Minutes = timeinfo.tm_min;
-  TimeStruct.Seconds = timeinfo.tm_sec;
+  TimeStruct.Hours   = timeInfo.tm_hour;
+  TimeStruct.Minutes = timeInfo.tm_min;
+  TimeStruct.Seconds = timeInfo.tm_sec;
   M5.Rtc.SetTime(&TimeStruct);
 
   RTC_DateTypeDef DateStruct;
-  DateStruct.WeekDay = timeinfo.tm_wday;
-  DateStruct.Month = timeinfo.tm_mon + 1;
-  DateStruct.Date = timeinfo.tm_mday;
-  DateStruct.Year = timeinfo.tm_year + 1900;
+  DateStruct.WeekDay = timeInfo.tm_wday;
+  DateStruct.Month = timeInfo.tm_mon + 1;
+  DateStruct.Date = timeInfo.tm_mday;
+  DateStruct.Year = timeInfo.tm_year + 1900;
   M5.Rtc.SetData(&DateStruct);
 }
 
 void setup() {
     M5.begin();
     M5.Lcd.setRotation(1);
-    M5.Lcd.printf("\nConnecting to %s", ssid);
+    M5.Lcd.printf("\nConnecting to %s \n", ssid);
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) { 
-        delay(500);
-        M5.Lcd.print(".");
+        delay(1000);
+        M5.Lcd.print("-");
     }
-    M5.Lcd.println("\nCONNECTED!");
-    configTime(gmtOffset_sec, daylightOffset_sec,ntpServer);  // init and get the time.
-    printLocalTime();
-    setTime(timeinfo);
-    WiFi.disconnect(true);  // Disconnect wifi.
-    WiFi.mode(WIFI_OFF);  // Set the wifi mode to off
+    M5.Lcd.println("Successful connection");
+    configTime(gmt_offset, daylightsaving,ntp_server);
+    checkServer();
+    setTime(timeInfo);
+    WiFi.disconnect(true);
     delay(20);
 }
 
 void loop() {
+    M5.Lcd.setCursor(0, 50);
+    printTime();
     delay(1000);
-    M5.Lcd.setCursor(0, 25);
-    printLocalTime();
 }

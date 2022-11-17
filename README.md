@@ -29,6 +29,8 @@ You have two buttons to interface with the M5StickC Hash Monster:
 
 Screen shows current channel mode, channel number, detected acces points, packets/deauths/hashes per second, and SD mode (SD is disabled when the icon is hidden). 
 
+The folder setWatch includes a sketch to set the time via an NTP server. The sketch has to be uploaded before uploading the Hash Monster sketch, if the time on your device is not correctly set. It is also suitable for M5Stack Core 2 (that has an RTC too).
+
 The rest of the functionality remains the same.
 
 
