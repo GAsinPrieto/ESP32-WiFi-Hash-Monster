@@ -28,7 +28,7 @@
 #define tft M5.Lcd
 #if !defined USE_M5STACK_UPDATER
   // comment this out to disable SD-Updater
-  #define USE_M5STACK_UPDATER
+  //#define USE_M5STACK_UPDATER
 #endif
 
 #ifdef USE_M5STACK_UPDATER
@@ -64,7 +64,29 @@
 #include "Buffer.h"
 #include "Faces.h"
 #include "FS.h"
+#ifndef ARDUINO_M5Stick_C
 #include "SD.h"
+#else
+#include "SdFat.h"
+
+// Chip select may be constant or RAM variable.
+const uint8_t SD_CS_PIN = -1;
+//
+// Pin numbers in templates must be constants.
+const uint8_t SOFT_MISO_PIN = 36;
+const uint8_t SOFT_MOSI_PIN = 26;
+const uint8_t SOFT_SCK_PIN  = 0;
+// SdFat software SPI template
+SoftSpiDriver<SOFT_MISO_PIN, SOFT_MOSI_PIN, SOFT_SCK_PIN> softSpi;
+// Speed argument is ignored for software SPI.
+#if ENABLE_DEDICATED_SPI
+#define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SD_SCK_MHZ(0), &softSpi)
+#else  // ENABLE_DEDICATED_SPI
+#define SD_CONFIG SdSpiConfig(SD_CS_PIN, SHARED_SPI, SD_SCK_MHZ(0), &softSpi)
+#endif  // ENABLE_DEDICATED_SPI
+
+SdFs sd;
+#endif
 
 #ifdef ARDUINO_M5STACK_FIRE
   #pragma GCC diagnostic push
@@ -83,7 +105,11 @@
 
 #define DRAW_DELAY 1000 // redraw graphs every second
 #define BUTTON_DEBOUNCE 150 // check button every n millis
+#ifdef ARDUINO_M5Stick_C
+#define PKTS_BUF_SIZE 150 // buffer size for "packets/s" graph
+#else
 #define PKTS_BUF_SIZE 320 // buffer size for "packets/s" graph
+#endif
 #define MAX_SSIDs 1792 // buffer cache size (*32bits) for Beacon information, reduce this in case of memory problems
 
 #if CONFIG_FREERTOS_UNICORE
@@ -92,6 +118,10 @@
   #define RUNNING_CORE 1
 #endif
 
+#ifdef ARDUINO_M5Stick_C
+int LEDoff=0; //LED on by default
+int screen_offset=0;
+#endif
 
 /* ===== run-time variables ===== */
 Buffer sdBuffer;
@@ -148,56 +178,120 @@ TFT_eSprite face1  = TFT_eSprite(&tft); // 16bits color sprite for face
 TFT_eSprite graph1 = TFT_eSprite(&tft); // 1bit   color sprite for graph1
 TFT_eSprite graph2 = TFT_eSprite(&tft); // 8bits  color sprite for graph2
 TFT_eSprite units1 = TFT_eSprite(&tft); // 1bit   color sprite for units1
+#ifdef ARDUINO_M5Stick_C
+TFT_eSprite watch  = TFT_eSprite(&tft); // 1bit   color sprite for units1
+#endif
 TFT_eSprite units2 = TFT_eSprite(&tft); // 8bits  color sprite for units2
 
 // position for header sprite
 int headerPosX = 0;
 int headerPosY = 0;
 // dimensions for header sprite
+#ifdef ARDUINO_M5Stick_C
+int headerWidth  = 160-headerPosX;
+int headerHeight = 9;
+#else
 int headerWidth  = 320-headerPosX;
 int headerHeight = 20;
+#endif
 
 // position for footer sprite
+#ifdef ARDUINO_M5Stick_C
+int footerPosX = 0;
+int footerPosY = 145;
+// dimensions for footer sprite
+int footerWidth  = 160-footerPosX;
+int footerHeight = 180-footerPosY;
+#else
 int footerPosX = 20;
 int footerPosY = 202;
 // dimensions for footer sprite
 int footerWidth  = 320-footerPosX;
 int footerHeight = 240-footerPosY;
+#endif
 
 // dimensions for monster sprite
+#ifdef ARDUINO_M5Stick_C
+int face1Width  = 32;
+int face1Height = 32;
+// position for monster sprite
+int face1PosX = 5;
+int face1PosY = 105;
+#else
 int face1Width  = 64;
 int face1Height = 64;
 // position for monster sprite
 int face1PosX = 5;
 int face1PosY = 140;
+#endif
 
 // dimensions for units1 sprite
+#ifdef ARDUINO_M5Stick_C
+int units1Width  = 21;
+int units1Height = 60;
+// position for units1 sprite
+int units1PosX = 0;
+int units1PosY = 15;
+#else
 int units1Width  = 40;
 int units1Height = 120;
 // position for units1 sprite
 int units1PosX = 0;
 int units1PosY = 20;
+#endif
+
+#ifdef ARDUINO_M5Stick_C
+// dimensions for watch sprite
+int watchWidth  = 80;
+int watchHeight = 14;
+// position for watch sprite
+int watchPosX = 80;
+int watchPosY = 7;
+#endif
 
 // dimensions for graph1 sprite
+#ifdef ARDUINO_M5Stick_C
+int graph1Width = 160-units1Width;
+int graph1Height = 55;
+// position for graph1 sprite
+int graph1PosX = units1Width+10;
+int graph1PosY = 20;
+#else
 int graph1Width = 320-units1Width;
 int graph1Height = 100;
 // position for graph1 sprite
 int graph1PosX = units1Width;
 int graph1PosY = 28;
+#endif
 
 // dimensions for units2 sprite
+#ifdef ARDUINO_M5Stick_C
+int units2Width  = 20;
+int units2Height = face1Height+10;
+// position for units2 sprite
+int units2PosX = 160-units2Width;
+int units2PosY = graph1PosY+graph1Height+30;
+#else
 int units2Width  = 36;
 int units2Height = face1Height;
 // position for units2 sprite
 int units2PosX = 320-units2Width;
 int units2PosY = graph1PosY+graph1Height+2;
+#endif
 
 // position for graph2 sprite
 int graph2PosX = face1Width+face1PosX+5; // right side of monster sprite
+#ifdef ARDUINO_M5Stick_C
+int graph2PosY = graph1PosY+graph1Height+35;
+// dimensions for graph2 sprite
+int graph2Width = 160-(graph2PosX+units2Width); // must fit between monster sprite and unit2 sprite
+int graph2Height = face1Height+4;
+#else
 int graph2PosY = graph1PosY+graph1Height+6;
 // dimensions for graph2 sprite
 int graph2Width = 320-(graph2PosX+units2Width); // must fit between monster sprite and unit2 sprite
 int graph2Height = face1Height-4;
+#endif
 
 
 /*
@@ -321,6 +415,10 @@ void setup()
   #endif
   M5.begin(); // this will fire Serial.begin()
 
+  #ifdef ARDUINO_M5Stick_C
+    pinMode(10, OUTPUT); //LED
+    digitalWrite(10, HIGH);
+  #endif
   #ifdef USE_M5STACK_UPDATER
     // New SD Updater support, requires the latest version of https://github.com/tobozo/M5Stack-SD-Updater/
     #if defined M5_SD_UPDATER_VERSION_INT
@@ -333,7 +431,12 @@ void setup()
   bool toggle = false;
   unsigned long lastcheck = millis();
   tft.fillScreen(TFT_BLACK);
+  tft.setRotation(1);
+#ifdef ARDUINO_M5Stick_C
+  while( !sd.begin(SD_CONFIG) ) {
+#else
   while( !M5.sd_begin() ) {
+#endif
     toggle = !toggle;
     tft.setTextColor( toggle ? TFT_BLACK : TFT_WHITE );
     tft.setTextDatum( MC_DATUM );
@@ -363,6 +466,8 @@ void setup()
 
   #ifdef ARDUINO_M5STACK_Core2
     // specific M5Core2 tweaks go here
+  #elif defined(ARDUINO_M5Stick_C)
+    // specific M5Stick_C tweaks go here
   #else // M5Classic / M5Fire turn buzzer off
     M5.Speaker.write(0);
   #endif
@@ -371,7 +476,7 @@ void setup()
   xTaskCreatePinnedToCore( initSpritesTask,   "initSpritesTask",   8192, NULL, 16, NULL, RUNNING_CORE);
   xTaskCreatePinnedToCore( coreTask,          "coreTask",          8192, NULL, 16, NULL, RUNNING_CORE);
 
-  #ifdef ARDUINO_M5STACK_FIRE
+  #if defined(ARDUINO_M5STACK_FIRE) || defined(ARDUINO_M5Stick_C)
   xTaskCreatePinnedToCore( &blinky,           "blinky",            2500, NULL, 1,  NULL, 1);
   #endif
 
@@ -429,6 +534,9 @@ static void initSpritesTask( void* param )
   }
   units2.setTextDatum( TR_DATUM );
   units2.setFont( &fonts::Font2 );
+#ifdef ARDUINO_M5Stick_C
+  units2.setTextSize( 0.75 );
+#endif
   units2.fillSprite(TFT_BLACK);
 
   // Create a 1bit sprite for the graph1
@@ -452,9 +560,26 @@ static void initSpritesTask( void* param )
   units1.setTextColor( TFT_WHITE, TFT_BLACK );
   units1.setBitmapColor( TFT_WHITE, TFT_BLACK);  // Pkts Scale
   units1.setTextDatum(MR_DATUM);
+#ifdef ARDUINO_M5Stick_C
+  units1.setTextSize( 1.0 );
+#else
   units1.setTextSize( 0.75 );
+#endif
   units1.fillSprite(TFT_BLACK);
 
+  #ifdef ARDUINO_M5Stick_C
+    // Create a 1bit sprite for the watch
+    watch.setColorDepth(1);
+    if(!watch.createSprite( watchWidth, watchHeight ) ) {
+      log_e("Can't create watch sprite");
+    }
+    watch.setFont(&fonts::FreeMono9pt7b);
+    watch.setBitmapColor( TFT_GREEN, TFT_BLACK );
+    watch.setTextColor( TFT_WHITE, TFT_BLACK );
+    watch.setTextDatum( TR_DATUM );
+    watch.setTextSize( 1.0 );
+    watch.fillSprite(TFT_BLACK);
+  #endif
   // Create a 16bits sprite for the monster
   face1.setColorDepth(16);
   if(!face1.createSprite( face1Width, face1Height ) ) {
@@ -487,14 +612,27 @@ static void bootAnimationTask( void* param )
   tft.setTextSize(0);
 
   tft.setFont(&fonts::FreeMono12pt7b);
+#ifdef ARDUINO_M5Stick_C
+  tft.drawString( "Purple Hash Monster", 26, 2, 1);
+  tft.drawString( "by @g4lile0", 46, 12, 1);
+  tft.drawString( "90% PacketMonitor32", 26, 27, 1);
+  tft.drawString( "by @Spacehuhn", 46, 37, 1);
+  tft.drawString( "Adapted to M5StickC", 26, 52, 1);
+  tft.drawString( "by @GAsinPrieto", 36, 62, 1);
+#else
   tft.drawString( "Purple Hash Monster", 6, 24);
   tft.drawString( "by @g4lile0", 26, 44);
   tft.drawString( "90% PacketMonitor32", 6, 74);
   tft.drawString( "by @Spacehuhn", 26, 94);
+#endif
   tft.setSwapBytes(true);
 
   ypos = voffset - ( abs( cos(vcursor) )*vamplitude );
+#ifdef ARDUINO_M5Stick_C
+  tft.pushImage(xpos, ypos, 32, 32, monsterSet[imgId]);
+#else
   tft.pushImage(xpos, ypos, 64, 64, monsterSet[imgId]);
+#endif
 
   // animate the monster while the sprites are being inited
   while( waitmillis-- > 0 || ( waitmillis < 0 && !UIReady) ) {
@@ -503,14 +641,22 @@ static void bootAnimationTask( void* param )
     if(  (xdir == 1  && xpos+xdir >= tft.width()-64)
       || (xdir == -1 && xpos+xdir < 0 ) ) {
       xdir = -xdir;
+    #ifdef ARDUINO
+      imgId = random(0,13);
+    #else
       imgId = random()%13;
+    #endif
     }
     xpos += xdir*hstep;
     vcursor += vstep;
     vTaskDelay(1);
   }
 
+#ifdef ARDUINO_M5Stick_C
+  tft.fillRect( 0, 0, 160, 120, TFT_BLACK );
+#else
   tft.fillRect( 0, 0, 320, 120, TFT_BLACK );
+#endif
 
   tft.drawString( "Checking SD...", 6, 74);
 
@@ -521,10 +667,17 @@ static void bootAnimationTask( void* param )
   }
 
   if ( setupSD() ) {
+  #ifdef ARDUINO_M5Stick_C
+    sdBuffer.checkFS(&sd);
+    sdBuffer.pruneZeroFiles(&sd); // SD cleanup: remove zero-length pcap files from previous scans
+
+    if( sdBuffer.open(&sd) ) {
+  #else
     sdBuffer.checkFS(&SD);
     sdBuffer.pruneZeroFiles(&SD); // SD cleanup: remove zero-length pcap files from previous scans
 
     if( sdBuffer.open(&SD) ) {
+  #endif
       Serial.println("SD CHECK OPEN");
     } else {
       Serial.println("SD ERROR, Can't create file");
@@ -535,7 +688,11 @@ static void bootAnimationTask( void* param )
     Serial.println("SD Setup failed");
   }
 
+#ifdef ARDUINO_M5Stick_C
+  tft.drawString( "Setting up WiFi...", 6, 44, 1);
+#else
   tft.drawString( "Setting up WiFi...", 6, 44);
+#endif
 
   setupWiFiPromisc();
 
@@ -550,7 +707,11 @@ static void bootAnimationTask( void* param )
 double getMultiplicator( uint32_t range )
 {
   uint32_t maxVal = 1;
+#ifdef ARDUINO_M5Stick_C
+  for (int i = 21; i < PKTS_BUF_SIZE; i++) {
+#else
   for (int i = 40; i < PKTS_BUF_SIZE; i++) {
+#endif
     if (pkts[i] > maxVal) maxVal = pkts[i];
   }
   if (maxVal > 0) {
@@ -615,12 +776,17 @@ bool setupSD()
   M5.sd_end();
   int attempts = 20;
   do {
+  #ifdef ARDUINO_M5Stick_C
+    SDSetupDone = sd.begin(SD_CONFIG);
+  #else
     SDSetupDone = M5.sd_begin(); // SD.begin( TFCARD_CS_PIN );
+  #endif
   } while( --attempts > 0 && ! SDSetupDone );
 
   if (!SDSetupDone ) {
     Serial.println("Card Mount Failed"); return false;
   }
+#ifndef ARDUINO_M5Stick_C
   uint8_t cardType = SD.cardType();
   if (cardType == CARD_NONE) {
     SDSetupDone = false;
@@ -638,6 +804,9 @@ bool setupSD()
   }
   uint64_t cardSize = SD.cardSize() / (1024 * 1024);
   Serial.printf("SD_MMC Card Size: %lluMB\n", cardSize);
+#else
+  useSD=true;
+#endif
   SDSetupDone = true;
   return true;
 }
@@ -739,6 +908,8 @@ void wifi_promiscuous(void* buf, wifi_promiscuous_pkt_type_t type)
         leds[pixelNumber].setRGB( bright_leds, 0, 0);;
       }
       FastLED.show();
+    #elif defined(ARDUINO_M5Stick_C)
+      if (LEDoff==0) digitalWrite(10, LOW);
     #endif
   }
 
@@ -751,6 +922,8 @@ void wifi_promiscuous(void* buf, wifi_promiscuous_pkt_type_t type)
         leds[pixelNumber].setRGB(  0,bright_leds, 0);
       }
       FastLED.show();
+    #elif defined(ARDUINO_M5Stick_C)
+      if (LEDoff==0) digitalWrite(10, LOW);
     #endif
 
     log_d("Got EAPOL ...");
@@ -896,19 +1069,35 @@ void wifi_promiscuous(void* buf, wifi_promiscuous_pkt_type_t type)
 // ===== UI functions ===================================================
 
 
+#ifdef ARDUINO_M5Stick_C
+void drawHeaderVal( TFT_eSprite *sprite, int32_t posx, int32_t posy, String title, String value, int isSD)
+#else
 void drawHeaderVal( TFT_eSprite *sprite, int32_t posx, int32_t posy, String title, String value )
+#endif
 {
   header.setTextColor( TFT_BLUE ); // invert
+#ifdef ARDUINO_M5Stick_C
+  uint8_t rectW = (title.length()*8)+0;
+  if (isSD && value=="Off") header.fillRect( posx, posy, rectW-2, 8, TFT_BLUE );
+  else header.fillRect( posx, posy, rectW-2, 8, TFT_BLACK );
+  header.drawString(title, posx, posy, 1);
+  if (!isSD) { header.setTextColor( TFT_BLACK, TFT_BLUE ); // restore
+  header.drawString(value, posx+rectW, posy, 1);}
+#else
   uint8_t rectW = (title.length()*8)+4;
   header.fillRect( posx, posy, rectW, 14, TFT_BLACK );
   header.drawString(title, posx+2, posy);
   header.setTextColor( TFT_BLACK, TFT_BLUE ); // restore
   header.drawString(value, posx+rectW, posy);
+#endif
 }
 
 
 void draw()
 {
+#ifdef ARDUINO_M5Stick_C
+  digitalWrite(10, HIGH);
+#endif
   int len, rssi;
   if (pkts[PKTS_BUF_SIZE - 1] > 0)
     rssi = rssiSum / (int)pkts[PKTS_BUF_SIZE - 1];
@@ -932,12 +1121,21 @@ void draw()
 
   header.fillSprite( TFT_BLUE );
 
+#ifdef ARDUINO_M5Stick_C
+  drawHeaderVal( &header, 2,   0, modeStr,  "" , 0);
+  drawHeaderVal( &header, 10,  0, "C",     String(ch) , 0);
+  drawHeaderVal( &header, 30,  0, "AP",     String(formatUnit(ssid_count)) , 0);
+  drawHeaderVal( &header, 60, 0, "P",     String(formatUnit(tmpPacketCounter)) , 0);
+  drawHeaderVal( &header, 90, 0, "E/D",    String(formatUnit(eapol))+"/"+String(formatUnit(deauths)) , 0);
+  drawHeaderVal( &header, 148, 0, "SD",     String(useSD?"On":"Off") , 1);
+#else
   drawHeaderVal( &header, 2,   4, modeStr,  "" );
   drawHeaderVal( &header, 22,  4, "CH",     ":"+String(ch) );
   drawHeaderVal( &header, 70,  4, "AP",     ":"+String(formatUnit(ssid_count)) );
   drawHeaderVal( &header, 130, 4, "Pk",     ":"+String(formatUnit(tmpPacketCounter)) );
   drawHeaderVal( &header, 192, 4, "E/D",    ":"+String(formatUnit(eapol))+"/"+String(formatUnit(deauths)) );
   drawHeaderVal( &header, 268, 4, "SD",     ":"+String(useSD?"On":"Off") );
+#endif
 
   header.pushSprite( headerPosX, headerPosY );
 
@@ -956,6 +1154,24 @@ void draw()
 
   units1.fillSprite( TFT_BLACK );
 
+#ifdef ARDUINO_M5Stick_C
+  for ( int ypos = units1Height-6, idx = 0; ypos > 0; ypos -= 9 )
+  {
+    units1.drawString(String( int( idx * valstep ) ), 21, ypos , 1);
+    idx++;
+  }
+
+  units1.pushSprite( units1PosX, units1PosY+5-screen_offset );
+
+   for (int i = 21; i < PKTS_BUF_SIZE; i++) {
+    int xpos = i-21;
+    len = pkts[i] * multiplicator;
+    graph1.drawLine(xpos, graph1Height, xpos, 0, 0);                 // LINE ERASE
+    graph1.drawLine(xpos, graph1Height, xpos, graph1Height - len/2, 1);// LINE DRAW
+    // scroll pkts data buffer
+    if (i < PKTS_BUF_SIZE - 1) pkts[i] = pkts[i + 1];
+  }
+#else
   for ( int ypos = units1Height-10, idx = 0; ypos > 0; ypos -= 20 )
   {
     units1.drawString(String( int( idx * valstep ) ), 30, ypos );
@@ -972,10 +1188,14 @@ void draw()
     // scroll pkts data buffer
     if (i < PKTS_BUF_SIZE - 1) pkts[i] = pkts[i + 1];
   }
+#endif
 
-  #ifdef ARDUINO_M5STACK_Core2
+#if defined(ARDUINO_M5STACK_Core2) || defined(ARDUINO_M5Stick_C)
     // show onscreen clock since M5Core2 has a RTC module
     struct timeval tv;
+  #ifdef ARDUINO_M5Stick_C
+    watch.fillSprite( TFT_BLACK );
+  #endif
     if (gettimeofday(&tv, NULL)!= 0) {
       // Failed to obtain time
     } else {
@@ -983,16 +1203,31 @@ void draw()
       ptm = localtime (&tv.tv_sec);
       char timeStr[15] = {0};
       const char* timeTpl = " %02d : %02d : %02d";
+  
+  
+      //if time needs to be set, set and run setWatch.ino, in setWatch folder
+      
+      
       snprintf( timeStr, 14, timeTpl, ptm->tm_hour, ptm->tm_min, ptm->tm_sec );
+    #ifdef ARDUINO_M5Stick_C
+      watch.drawString( timeStr, watchWidth, 0 , 2);
+      watch.pushSprite( watchPosX, watchPosY-screen_offset );
+    #else
       graph1.drawString( timeStr, graph1Width, 0 );
+    #endif
     }
   #endif
 
+#ifdef ARDUINO_M5Stick_C
+  graph1.pushSprite( graph1PosX, graph1PosY-screen_offset );
+#else
   graph1.pushSprite( graph1PosX, graph1PosY );
+#endif
 
   byte aleatorio; // = random (1,10);
 
   if ((deauths>0) && (eapol==0)) {
+#ifndef ARDUINO_M5Stick_C
     face1.pushImage(0, 0, face1Width, face1Height, angry_64);
   }
 
@@ -1031,6 +1266,46 @@ void draw()
 
   face1.pushSprite( face1PosX, face1PosY, TFT_BLACK);
 
+#else
+      face1.pushImage(0, 0, face1Width, face1Height, angry_32);
+  }
+
+  if (tmpPacketCounter<10) {
+    aleatorio = random (1,5);
+    switch (aleatorio) {
+      case 1:  face1.pushImage(0, 0, face1Width, face1Height, bored1_32); break;
+      case 2:  face1.pushImage(0, 0, face1Width, face1Height, bored2_32); break;
+      case 3:  face1.pushImage(0, 0, face1Width, face1Height, bored3_32); break;
+      case 4:  face1.pushImage(0, 0, face1Width, face1Height, sleep1_32); break;
+      default: face1.pushImage(0, 0, face1Width, face1Height, sleep2_32); break;
+    }
+  }
+
+  if (tmpPacketCounter>500) {
+    aleatorio = random (1,2);
+    switch (aleatorio) {
+      case 1:  face1.pushImage(0, 0, face1Width, face1Height, scare_32);    break;
+      default: face1.pushImage(0, 0, face1Width, face1Height, surprise_32); break;
+    }
+  }
+
+  if ((eapol==0) && (deauths==0) && (tmpPacketCounter>10)) {
+    aleatorio = random (1,5);
+    switch (aleatorio) {
+      case 1:  face1.pushImage(0, 0, face1Width, face1Height, happy_32);  break;
+      case 2:  face1.pushImage(0, 0, face1Width, face1Height, happy2_32); break;
+      case 3:  face1.pushImage(0, 0, face1Width, face1Height, happy3_32); break;
+      default: face1.pushImage(0, 0, face1Width, face1Height, happy4_32); break;
+    }
+  }
+
+  if (eapol>0)   {
+    face1.pushImage(0, 0, face1Width, face1Height, love_32);
+  }
+
+  face1.pushSprite( face1PosX, face1PosY-screen_offset, TFT_BLACK);
+  
+#endif
   draw_RSSI();
 }
 
@@ -1042,10 +1317,19 @@ void draw_RSSI()
   footer.fillSprite( TFT_BLUE );
 
   String p = String(last_ssid[0]!='\0' ? last_ssid : "[hidden]" )+" "+(String)last_rssi+" "+(String)last_ssid_mac;
+#ifdef ARDUINO_M5Stick_C
+  footer.drawString(p, 2, 3, 1);
+#else
   footer.drawString(p, 2, 3);
+#endif
   p = String(last_eapol_ssid[0]!='\0'? last_eapol_ssid : "[none]")+" "+(String)last_eapol_mac;
+#ifdef ARDUINO_M5Stick_C
+  footer.drawString(p, 2, 3+10, 1);
+  footer.pushSprite( footerPosX, footerPosY-screen_offset );
+#else
   footer.drawString(p, 2, 3+18);
   footer.pushSprite( footerPosX, footerPosY );
+#endif
 
   // Draw point in graph2 sprite at far right edge (this will scroll left later)
   if (graph_RSSI != 0)  graph2.drawFastVLine( graph2Width, -(graph_RSSI/2), 2, TFT_YELLOW); // draw 2 pixel point on graph
@@ -1064,7 +1348,11 @@ void draw_RSSI()
   }
 
   // Push the sprites onto the TFT at specified coordinates
+#ifdef ARDUINO_M5Stick_C
+  graph2.pushSprite( graph2PosX, graph2PosY-screen_offset );
+#else
   graph2.pushSprite( graph2PosX, graph2PosY );
+#endif
   // Now scroll the sprites scroll(dt, dy) where:
   // dx is pixels to scroll, left = negative value, right = positive value
   // dy is pixels to scroll, up = negative value, down = positive value
@@ -1072,12 +1360,20 @@ void draw_RSSI()
 
   // Draw the grid on far right edge of sprite as graph has now moved 1 pixel left
   grid++;
+#ifdef ARDUINO_M5Stick_C
+  if (grid >= 5) {
+#else
   if (grid >= 10) {
+#endif
     // Draw a vertical line if we have scrolled 10 times (10 pixels)
     grid = 0;
     graph2.drawFastVLine( graph2Width, 0, 61, TFT_NAVY ); // draw line on graph
   } else { // Otherwise draw points spaced 10 pixels for the horizontal grid lines
+  #ifdef ARDUINO_M5Stick_C
+    for (int p = 0; p <= graph2Height; p += 5) graph2.drawPixel( graph2Width, p, TFT_NAVY );
+  #else
     for (int p = 0; p <= graph2Height; p += 10) graph2.drawPixel( graph2Width, p, TFT_NAVY );
+  #endif
   }
   tcount--;
 
@@ -1088,6 +1384,17 @@ void draw_RSSI()
   units2.drawString( " " + String(formatUnit(graph_RSSI)),       units2Width-1, 2 );
 
   units2.setTextColor( TFT_GREEN,  TFT_BLACK );
+#ifdef ARDUINO_M5Stick_C
+  units2.drawString( " " + String(formatUnit(total_eapol)),      units2Width-1, 12 );
+
+  units2.setTextColor( TFT_RED,    TFT_BLACK );
+  units2.drawString( " " + String(formatUnit(total_deauths)),    units2Width-1, 22 );
+
+  units2.setTextColor( TFT_WHITE,  TFT_BLACK );
+  units2.drawString( " " + String(formatUnit(ssid_eapol_count)), units2Width-1, 32 );
+
+  units2.pushSprite( units2PosX, units2PosY-screen_offset );
+#else
   units2.drawString( " " + String(formatUnit(total_eapol)),      units2Width-1, 18 );
 
   units2.setTextColor( TFT_RED,    TFT_BLACK );
@@ -1097,6 +1404,7 @@ void draw_RSSI()
   units2.drawString( " " + String(formatUnit(ssid_eapol_count)), units2Width-1, 50 );
 
   units2.pushSprite( units2PosX, units2PosY );
+#endif
 }
 
 
@@ -1114,9 +1422,15 @@ void coreTask( void * p )
 
   tft.clear();
   // draw icons
+#ifdef ARDUINO_M5Stick_C
+  tft.fillRect( 0, footerPosY-screen_offset, 32, 40, TFT_BLUE );
+  tft.pushImage( 2, footerPosY-screen_offset+2,  16, 16, (uint16_t*)rssi_16x16_rgb565,  TFT_BLACK );
+  tft.pushImage( 2, footerPosY-screen_offset+20, 16, 16, (uint16_t*)eapol_16x16_rgb565, TFT_BLACK );
+#else
   tft.fillRect( 0, footerPosY, 32, 40, TFT_BLUE );
   tft.pushImage( 2, footerPosY+2,  16, 16, (uint16_t*)rssi_16x16_rgb565,  TFT_BLACK );
   tft.pushImage( 2, footerPosY+20, 16, 16, (uint16_t*)eapol_16x16_rgb565, TFT_BLACK );
+#endif
 
   lastButtonTime = millis();
   M5.update();
@@ -1146,6 +1460,62 @@ void coreTask( void * p )
       //  - SD Activation  => BtnA long press (enable/disable SD)
       //  - Brightness     => BtnB short press (cycle through values)
       //  - Channel hop    => BtnC long press for mode change, short press for manual change
+      
+      // buttons assignment for M5StickC:
+      //  - Change screen half => BtnA short press
+      //  - Brightness     => BtnA long press (cycle through values - zero brightness = incognito mode)
+      //  - SD Activation  => BtnA very long press (enable/disable SD)
+      //  - Channel hop    => BtnB long press for mode change, short press for manual change
+      
+      
+      
+    #ifdef ARDUINO_M5Stick_C
+      if(M5.BtnB.isPressed()){
+        if(M5.BtnA.wasReleased()){
+          // toggle SD use
+          if ( useSD ) { // in use, disable
+            sdBuffer.close(&sd); // flush current buffer
+            useSD = false;
+            SDSetupDone = false;
+            M5.sd_end();
+          } else { // not in use, try to enable
+            if ( setupSD() ) {
+              if( !sdBuffer.open(&sd) ) {
+                Serial.println(" SD ERROR, Can't create file, disabling SD");
+                useSD = false;
+                SDSetupDone = false;
+                M5.sd_end();
+              }
+            }
+          }
+        }
+      }else if( M5.BtnA.wasReleased() ) {
+        tft.fillScreen(TFT_BLACK);
+        if (screen_offset==0) screen_offset = 86;
+        else screen_offset=0;
+      } else if (M5.BtnA.wasReleasefor(700)) {
+        bright+=50;
+        if (bright>251) {bright=0;LEDoff=1;}
+        else LEDoff=0;
+        tft.setBrightness(bright);
+      }else if( M5.BtnB.wasReleased() ) {
+        setChannel(ch + 1);
+        needDraw = true;
+      } else if (M5.BtnB.wasReleasefor(700)) {
+        autoChMode++;
+        if (autoChMode>2) autoChMode=0;
+        Serial.printf("Channel hop mode is now set to: %s\n", authChmodeStr[autoChMode] );
+        preferences.begin("packetmonitor32", false);
+        preferences.putUInt("autoChMode", autoChMode);
+        preferences.end();
+      }
+      lastButtonTime = currentTime;
+      if (needDraw) draw();
+    }
+
+    // maintain buffer and save to SD if necessary
+    if (useSD) sdBuffer.save(&sd);
+  #else
       if( M5.BtnA.wasReleased() ) {
         if (bright>1) {
           Serial.println("Incognito Mode");
@@ -1205,6 +1575,7 @@ void coreTask( void * p )
 
     // maintain buffer and save to SD if necessary
     if (useSD) sdBuffer.save(&SD);
+  #endif
     // draw Display
     if ( currentTime - lastDrawTime > DRAW_DELAY ) {
       lastDrawTime = currentTime;
@@ -1232,11 +1603,12 @@ void coreTask( void * p )
 }
 
 
-#ifdef ARDUINO_M5STACK_FIRE
+#if defined(ARDUINO_M5STACK_FIRE) || defined(ARDUINO_M5Stick_C)
 void blinky( void * p )
 {
   while(1) {
     if ((eapol== 0) && (deauths == 0)) {
+    #ifdef ARDUINO_M5STACK_FIRE
       for (int pixelNumber = 0; pixelNumber < M5STACK_FIRE_NEO_NUM_LEDS ; pixelNumber++){
         leds[pixelNumber].setRGB(  0, 0, 0);
         if (led_status==pixelNumber)
@@ -1246,6 +1618,9 @@ void blinky( void * p )
       if (led_status>M5STACK_FIRE_NEO_NUM_LEDS)
         led_status=0;
       FastLED.show();
+    #elif defined(ARDUINO_M5Stick_C)
+      digitalWrite(10, HIGH);
+    #endif
     }
     int led_delay =1000;
     if (ledPacketCounter == 0) led_delay = 2000;

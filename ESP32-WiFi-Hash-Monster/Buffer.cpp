@@ -21,43 +21,89 @@ bool Buffer::init() {
 
 
 
+#ifndef ARDUINO_M5Stick_C
 void Buffer::checkFS(fs::FS* fs) {
+#else
+void Buffer::checkFS(SdFs* fs) {
+#endif
   if( !fs->exists( folderName ) ) {
     fs->mkdir( folderName );
   }
 }
 
 
+#ifndef ARDUINO_M5Stick_C
 void Buffer::pruneZeroFiles(fs::FS* fs)
+#else
+void Buffer::pruneZeroFiles(SdFs* fs)
+#endif
 {
+#ifndef ARDUINO_M5Stick_C
   fs::File root = fs->open( folderName );
+#else
+  FsFile root;
+  root.open(folderName);
+#endif
   if( ! root.isDirectory() ) {
     log_e("'%s' is not a directory", folderName );
     root.close();
     return;
   }
+#ifndef ARDUINO_M5Stick_C
   fs::File fileToCheck;
   while( fileToCheck = root.openNextFile() ) {
+#else
+  FsFile fileToCheck;
+  while( fileToCheck.openNext(&root, O_RDONLY) ) {
+#endif
     if( fileToCheck.isDirectory() ) continue;
     #if defined ESP_IDF_VERSION_MAJOR && ESP_IDF_VERSION_MAJOR >= 4
       String path = fileToCheck.path();
     #else
+      #ifndef ARDUINO_M5Stick_C
       String path = fileToCheck.name();
+      #else
+      char path[150];
+      fileToCheck.getName(path,sizeof(path));
+      #endif
     #endif
+  #ifdef ARDUINO_M5Stick_C
+    int size = fileToCheck.size();
+  #else
     size_t size = fileToCheck.size();
+  #endif
     fileToCheck.close();
+  #ifndef ARDUINO_M5Stick_C
     if( path.endsWith(".pcap") && size == 0 ) {
       fs->remove( path.c_str() );
       Serial.printf("Removed empty file: %s\n", path.c_str() );
     } else {
       log_d("Found existing pcap file: %s (%d bytes)", path.c_str(), size );
     }
+  #else
+    char* p = strchr(path, '.');
+    if (p) {
+      if ((p[1] == 'p') && (p[2] == 'c') && (p[3] == 'a') && (p[4] == 'p')){
+        if (size == 0){
+          root.remove(path);
+          Serial.printf("Removed empty file: %s\n", path );
+        }
+      }
+      else{
+        log_d("Found existing pcap file: %s (%d bytes)", path, size );
+      }
+    }
+  #endif
   }
   root.close();
 }
 
 
+#ifndef ARDUINO_M5Stick_C
 bool Buffer::open(fs::FS* fs){
+#else
+bool Buffer::open(SdFs* fs){
+#endif
   int i=0;
   fileNameStr[0] = 0;
 
@@ -89,7 +135,11 @@ bool Buffer::open(fs::FS* fs){
   return true;
 }
 
+#ifndef ARDUINO_M5Stick_C
 void Buffer::close(fs::FS* fs){
+#else
+void Buffer::close(SdFs* fs){
+#endif
   if(!writing) return;
   forceSave(fs);
   writing = false;
@@ -170,7 +220,11 @@ void Buffer::write(uint8_t* buf, uint32_t len){
   }
 }
 
+#ifndef ARDUINO_M5Stick_C
 void Buffer::save(fs::FS* fs){
+#else
+void Buffer::save(SdFs* fs){
+#endif
   if(saving) return; // makes sure the function isn't called simultaneously on different cores
 
   // buffers are already emptied, therefor saving is unecessary
@@ -184,8 +238,12 @@ void Buffer::save(fs::FS* fs){
   uint32_t startTime = millis();
   uint32_t finishTime;
 
+#ifndef ARDUINO_M5Stick_C
   file = fs->open( fileNameStr, FILE_APPEND );
   if (!file) {
+#else
+  if (!file.open(fileNameStr, O_APPEND | O_CREAT | O_RDWR)) {
+#endif
     Serial.printf("Failed to open file %s\n", fileNameStr );
     useSD = false;
     return;
@@ -216,12 +274,20 @@ void Buffer::save(fs::FS* fs){
 
 }
 
+#ifndef ARDUINO_M5Stick_C
 void Buffer::forceSave(fs::FS* fs){
+#else
+void Buffer::forceSave(SdFs* fs){
+#endif
   uint32_t len = bufSizeA + bufSizeB;
   if(len == 0) return;
 
+#ifndef ARDUINO_M5Stick_C
   file = fs->open(fileNameStr, FILE_APPEND);
   if (!file) {
+#else
+  if (!file.open(fileNameStr, O_APPEND | O_CREAT | O_RDWR)) {
+#endif
     Serial.printf("Failed to open file %s\n", fileNameStr);
     useSD = false;
     return;

@@ -4,6 +4,9 @@
 #include "Arduino.h"
 #include "FS.h"
 //#include "SD_MMC.h"
+#ifdef ARDUINO_M5Stick_C
+#include "SdFat.h"
+#endif
 
 #if defined ARDUINO_M5Stack_Core_ESP32
   #define BUF_BLOCKS 4
@@ -26,13 +29,22 @@ class Buffer {
   public:
     Buffer();
     bool init();
+  #ifndef ARDUINO_M5Stick_C
     void checkFS(fs::FS* fs);
     bool open(fs::FS* fs);
     void close(fs::FS* fs);
-    void addPacket(uint8_t* buf, uint32_t len);
     void save(fs::FS* fs);
     void forceSave(fs::FS* fs);
     void pruneZeroFiles(fs::FS* fs);
+  #else
+    void checkFS(SdFs* fs);
+    bool open(SdFs* fs);
+    void close(SdFs* fs);
+    void save(SdFs* fs);
+    void forceSave(SdFs* fs);
+    void pruneZeroFiles(SdFs* fs);
+  #endif
+    void addPacket(uint8_t* buf, uint32_t len);    
 
   private:
     void write(int32_t n);
@@ -55,7 +67,11 @@ class Buffer {
     char fileNameStr[32] = {0};
     const char *folderName = "/pcap"; // no trailing slash
     const char *fileNameTpl = "%s/%04X.pcap"; // hex is better for natural sorting, assume max 65536 files
+  #ifndef ARDUINO_M5Stick_C
     File file;
+  #else
+    FsFile file;
+  #endif
 
     uint32_t previous_micros = 0;
     uint32_t micros_high = 0;
