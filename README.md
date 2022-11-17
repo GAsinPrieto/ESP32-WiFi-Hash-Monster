@@ -1,5 +1,23 @@
 # ESP32 WiFi Hash Monster
 
+UPDATED by GAsinPrieto
+
+
+I have modified the code to run on a M5StickC, with [SdFat](https://github.com/greiman/SdFat) library by greiman.
+
+To connect the SD Card reader, you yave to follow this correspondemce:
+
+SD Card Slot - M5SctickC
+* Vcc - 3V3
+* MOSI - G26
+* MISO - G36 (MISO must be used in this PIN, CLK and MOSI are interchangeable -by making the appropiate changes in the code, of course-)
+* CLK - G0
+* GND - GND
+* CS - GND
+
+
+ORIGINAL README
+
 <p align="center">
     <a href="https://github.com/G4lile0/ESP32-WiFi-Hash-Monster/blob/master/README.md"><img alt="Software License" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
     <a href="https://github.com/G4lile0/ESP32-WiFi-Hash-Monster/graphs/contributors"><img alt="Contributors" src="https://img.shields.io/github/contributors/G4lile0/ESP32-WiFi-Hash-Monster"/></a>
