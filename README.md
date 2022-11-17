@@ -15,6 +15,23 @@ SD Card Slot - M5SctickC
 * GND - GND
 * CS - GND
 
+LED is set to blink when packets are detected.
+
+You have two buttons to interface with the M5StickC Hash Monster:
+* Button A:
+    - Showrt Press: change screen half
+    - Long Press: chenge backlight (when backlight is off, you enter incognito mode, i.e. the LED does not blink either)
+* Button B
+    - Short Press: change Channel
+    - Long Press: change Channel mode (A: Automatic switching every 15 seconds, S: Smart switching when no activity is detected, C: fixed channel)
+* Button B + Button A (order is mandatory)
+    - Disable/Enable SD Card, Enabled by default on startup
+
+Screen shows current channel mode, channel number, detected acces points, packets/deauths/hashes per second, and SD mode (SD is disabled when the icon is hidden). 
+
+The rest of the functionality remains the same.
+
+
 
 ORIGINAL README
 
