@@ -5,8 +5,8 @@
 struct tm timeInfo;
 
 //WIFI Credentials
-const char* ssid     = "maiher";
-const char* password = "MH-08076298";
+const char* ssid     = "SSID";
+const char* password = "PASSWORD";
 
 const char* ntp_server = "ntp.i2t.ehu.es";
 const long gmt_offset     = 3600; //in seconds
