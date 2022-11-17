@@ -2,11 +2,21 @@
 
 <p align="center">
     <a href="https://github.com/G4lile0/ESP32-WiFi-Hash-Monster/blob/master/README.md"><img alt="Software License" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
-    <a href="https://github.com/G4lile0/ESP32-WiFi-Hash-Monster/graphs/contributors"><img alt="Contributors" src="https://img.shields.io/github/contributors/G4lile0/ESP32-WiFi-Hash-Monster"/></a>
-    <a href="https://twitter.com/intent/follow?screen_name=g4lile0"><img src="https://img.shields.io/twitter/follow/g4lile0?style=social&logo=twitter" alt="follow on Twitter"></a>
 </p>
 
 WiFi Hash Purple Monster, store EAPOL &amp; PMKID packets in an SD CARD using a M5STACK / ESP32 device.
+
+I have modified the code to run on a M5StickC, with [SdFat](https://github.com/greiman/SdFat) library by greiman.
+
+To connect the SD Card reader, you yave to follow this correspondemce:
+
+SD Card Slot - M5SctickC
+* Vcc - 3V3
+* MOSI - G26
+* MISO - G36 (MISO must be used in this PIN, CLK and MOSI are interchangeable -by making the appropiate changes in the code, of course-)
+* CLK - G0
+* GND - GND
+* CS - GND
 
 90% of the code is based on the great [PacketMonitor32](https://github.com/spacehuhn/PacketMonitor32/) from   &nbsp; <a href="https://twitter.com/intent/follow?screen_name=spacehuhn"><img src="https://img.shields.io/twitter/follow/spacehuhn?style=social&logo=twitter" alt="follow on Twitter"></a> and the port to [M5Stack](https://m5stack.com/) from [macsbug](https://macsbug.wordpress.com/2018/01/11/packetmonitor32-with-m5stack/). It was a challenge to see if I could mimic the operation of [pwnagotchi](https://github.com/evilsocket/pwnagotchi)
 <a href="https://twitter.com/intent/follow?screen_name=pwnagotchi"><img src="https://img.shields.io/twitter/follow/pwnagotchi?style=social&logo=twitter" alt="follow on Twitter"></a> in an ESP32 SoC.
