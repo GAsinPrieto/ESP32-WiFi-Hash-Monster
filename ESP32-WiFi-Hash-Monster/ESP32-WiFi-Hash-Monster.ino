@@ -121,6 +121,7 @@ SdFs sd;
 #ifdef ARDUINO_M5Stick_C
 int LEDoff=0; //LED on by default
 int screen_offset=0;
+double vbat = 0.0;
 #endif
 
 /* ===== run-time variables ===== */
@@ -243,10 +244,10 @@ int units1PosY = 20;
 #ifdef ARDUINO_M5Stick_C
 // dimensions for watch sprite
 int watchWidth  = 80;
-int watchHeight = 14;
+int watchHeight = 10;
 // position for watch sprite
 int watchPosX = 80;
-int watchPosY = 7;
+int watchPosY = 9;
 #endif
 
 // dimensions for graph1 sprite
@@ -577,7 +578,7 @@ static void initSpritesTask( void* param )
     watch.setBitmapColor( TFT_GREEN, TFT_BLACK );
     watch.setTextColor( TFT_WHITE, TFT_BLACK );
     watch.setTextDatum( TR_DATUM );
-    watch.setTextSize( 1.0 );
+    watch.setTextSize( 0.8 );
     watch.fillSprite(TFT_BLACK);
   #endif
   // Create a 16bits sprite for the monster
@@ -1578,6 +1579,25 @@ void coreTask( void * p )
   #endif
     // draw Display
     if ( currentTime - lastDrawTime > DRAW_DELAY ) {
+
+      #ifdef ARDUINO_M5Stick_C
+      vbat = M5.Axp.GetBatVoltage() * 1.1;
+      if ( vbat < 3.6 ) { // in use, disable
+         sdBuffer.close(&sd); // flush current buffer
+         M5.sd_end();
+         tft.fillScreen(TFT_RED);
+         M5.Lcd.setCursor(10, 25, 1);
+         M5.Lcd.printf("Please recharge battery");
+         while(vbat<3.6) {
+            //tft.fillScreen(TFT_RED);
+            M5.Lcd.setCursor(10, 25, 1);
+            vbat = M5.Axp.GetBatVoltage() * 1.1;
+            M5.Lcd.printf("Please recharge battery\nCurrent battery voltage = %f",vbat);
+            delay(1000);
+         }
+      }else tft.fillScreen(TFT_BLACK);
+      #endif
+    
       lastDrawTime = currentTime;
       // Serial.printf("\nFree RAM %u %u\n",
       // heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT),
