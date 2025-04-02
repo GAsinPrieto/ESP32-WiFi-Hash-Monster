@@ -1,4 +1,4 @@
-# ESP32 WiFi Hash Monster
+# M5SticC WiFi Hash Monster
 
 UPDATED by GAsinPrieto
 
